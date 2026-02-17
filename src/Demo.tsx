@@ -316,10 +316,12 @@ export default function ExcelFormulaSupport() {
           showColumnVerticalBorder
           showCellVerticalBorder
           disableColumnFilter
-          disableColumnMenu
           disableColumnSorting
           hideFooter
           historyStackSize={0}
+          initialState={{
+            pinnedColumns: { left: ['__row_number__', 'name'] },
+          }}
           showToolbar
           slots={{
             toolbar: CustomToolbar,
