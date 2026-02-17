@@ -10,6 +10,7 @@ import {
   GridValueGetter,
   GridCellEditStopParams,
   GridCellEditStopReasons,
+  GridSortModel,
   useGridApiRef,
   DataGridProps,
 } from '@mui/x-data-grid';
@@ -56,6 +57,11 @@ export interface UseFormulaSupportResult {
    * This keeps all formula references intact.
    */
   moveRow: (sourceIndex: number, targetIndex: number) => void;
+  /**
+   * Sort rows in HyperFormula using moveRows() so formula references update.
+   * Uses sortingMode="server" pattern — the grid delegates sorting to HF.
+   */
+  sortRows: (sortModel: GridSortModel) => void;
 }
 
 interface HFRow extends GridRowModel {
@@ -484,6 +490,96 @@ export function useFormulaSupport(
     setHfVersion((v) => v + 1);
   });
 
+  /**
+   * Sort rows in HyperFormula by physically rearranging them via moveRows().
+   * This ensures all formula references (e.g., =SUM(B1:B10)) update correctly.
+   * The row_number column always shows sequential 1, 2, 3… after sort.
+   */
+  const sortRows = useEventCallback((sortModel: GridSortModel) => {
+    if (!hfRef.current || sortModel.length === 0) {
+      return;
+    }
+    const { hf, sheetId } = hfRef.current;
+    const rowCount = hf.getSheetDimensions(sheetId).height;
+
+    // Build array of { hfRowIndex, values } for sorting
+    const rowsWithValues = Array.from({ length: rowCount }, (_, i) => {
+      const values: Record<string, any> = {};
+      for (const [field, colIdx] of columnFieldMap.entries()) {
+        values[field] = hf.getCellValue({ sheet: sheetId, row: i, col: colIdx });
+      }
+      return { hfRowIndex: i, values };
+    });
+
+    // Sort using the sort model (supports multi-column)
+    rowsWithValues.sort((a, b) => {
+      for (const { field, sort } of sortModel) {
+        if (!sort) continue;
+        const colIdx = columnFieldMap.get(field);
+        if (colIdx === undefined) continue;
+
+        const va = a.values[field];
+        const vb = b.values[field];
+        const direction = sort === 'asc' ? 1 : -1;
+
+        // Push errors/nulls to bottom
+        const isErrA = va != null && typeof va === 'object';
+        const isErrB = vb != null && typeof vb === 'object';
+        if (isErrA && !isErrB) return 1;
+        if (!isErrA && isErrB) return -1;
+        if (isErrA && isErrB) continue;
+        if (va == null && vb != null) return 1;
+        if (va != null && vb == null) return -1;
+
+        // Compare
+        let cmp = 0;
+        if (typeof va === 'string' && typeof vb === 'string') {
+          cmp = va.localeCompare(vb);
+        } else {
+          cmp = (Number(va) || 0) - (Number(vb) || 0);
+        }
+        if (cmp !== 0) return cmp * direction;
+      }
+      return 0;
+    });
+
+    // Apply the sort by moving rows one by one from top to bottom.
+    // We track where each original row currently sits after previous moves.
+    const currentPositions = Array.from({ length: rowCount }, (_, i) => i);
+
+    for (let targetPos = 0; targetPos < rowCount; targetPos++) {
+      const desiredOriginal = rowsWithValues[targetPos].hfRowIndex;
+      const currentPos = currentPositions[desiredOriginal];
+
+      if (currentPos !== targetPos) {
+        hf.moveRows(sheetId, [currentPos], targetPos);
+
+        // Update position tracking: the row that was at currentPos moved to targetPos
+        // All rows between shifted by 1
+        const movedOriginal = desiredOriginal;
+        for (const [origIdx, pos] of currentPositions.entries()) {
+          if (origIdx === movedOriginal) continue;
+          if (currentPos > targetPos) {
+            // Moved up: rows in [targetPos, currentPos) shift down by 1
+            if (pos >= targetPos && pos < currentPos) {
+              currentPositions[origIdx] = pos + 1;
+            }
+          } else {
+            // Moved down: rows in (currentPos, targetPos] shift up by 1
+            if (pos > currentPos && pos <= targetPos) {
+              currentPositions[origIdx] = pos - 1;
+            }
+          }
+        }
+        currentPositions[movedOriginal] = targetPos;
+      }
+    }
+
+    // Reset rowOrder to sequential since HF rows are now physically sorted
+    setRowOrder(Array.from({ length: rowCount }, (_, i) => i));
+    setHfVersion((v) => v + 1);
+  });
+
   return {
     columns: enhancedColumns as GridColDef[],
     rows,
@@ -496,5 +592,6 @@ export function useFormulaSupport(
     addColumn,
     isFieldDuplicate,
     moveRow,
+    sortRows,
   };
 }

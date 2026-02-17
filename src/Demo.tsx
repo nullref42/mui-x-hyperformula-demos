@@ -3,6 +3,7 @@ import useId from '@mui/utils/useId';
 import {
   DataGridPremium,
   GridSlotProps,
+  GridSortModel,
   useGridApiRef,
   useGridApiContext,
   useGridRootProps,
@@ -12,7 +13,6 @@ import {
   ExportPrint,
   ExportExcel,
   GridMenu,
-  GridSortCellParams,
 } from '@mui/x-data-grid-premium';
 import { GridToolbarDivider } from '@mui/x-data-grid/internals';
 import Box from '@mui/material/Box';
@@ -42,38 +42,6 @@ declare module '@mui/x-data-grid-premium' {
   }
 }
 
-// Custom sort comparator that handles HyperFormula errors gracefully.
-// Errors (objects with type property, or DetailedCellError instances) are
-// sorted to the bottom regardless of sort direction.
-const formulaSortComparator = (
-  v1: any,
-  v2: any,
-  param1: GridSortCellParams,
-  param2: GridSortCellParams,
-) => {
-  const isError1 = v1 != null && typeof v1 === 'object';
-  const isError2 = v2 != null && typeof v2 === 'object';
-
-  // Push errors to bottom
-  if (isError1 && isError2) return 0;
-  if (isError1) return 1;
-  if (isError2) return -1;
-
-  // Handle nulls
-  if (v1 == null && v2 == null) return 0;
-  if (v1 == null) return 1;
-  if (v2 == null) return -1;
-
-  // String comparison
-  if (typeof v1 === 'string' && typeof v2 === 'string') {
-    return v1.localeCompare(v2);
-  }
-
-  // Numeric comparison
-  return (Number(v1) || 0) - (Number(v2) || 0);
-};
-
-// Extended sample data with more rows so sorting is meaningful
 const rowData = [
   {
     id: 1,
@@ -157,58 +125,20 @@ const rowData = [
   },
   {
     id: 11,
-    name: 'Error Demo',
-    year_1: 2.50,
-    year_2: '=B11/0',
-    average: '=AVERAGE(B11:C11)',
-    sum: '=SUM(B11:C11)',
-  },
-  {
-    id: 12,
     name: 'Total',
-    year_1: '=SUM(B1:B11)',
-    year_2: '=SUM(C1:C11)',
-    average: '=IF(SUM(D1:D11)>100, "Greater than 100", "Less than 100")',
-    sum: '=SUM(E1:E11)',
+    year_1: '=SUM(B1:B10)',
+    year_2: '=SUM(C1:C10)',
+    average: '=IF(SUM(D1:D10)>100, "Greater than 100", "Less than 100")',
+    sum: '=SUM(E1:E10)',
   },
 ];
 
 const baseColumns: FormulaColumnDef[] = [
-  {
-    field: 'name',
-    headerName: 'Name',
-    width: 140,
-    type: 'formula',
-    sortComparator: formulaSortComparator,
-  },
-  {
-    field: 'year_1',
-    headerName: 'Year_1',
-    width: 100,
-    type: 'formula',
-    sortComparator: formulaSortComparator,
-  },
-  {
-    field: 'year_2',
-    headerName: 'Year_2',
-    width: 100,
-    type: 'formula',
-    sortComparator: formulaSortComparator,
-  },
-  {
-    field: 'average',
-    headerName: 'Average',
-    width: 110,
-    type: 'formula',
-    sortComparator: formulaSortComparator,
-  },
-  {
-    field: 'sum',
-    headerName: 'Sum',
-    width: 110,
-    type: 'formula',
-    sortComparator: formulaSortComparator,
-  },
+  { field: 'name', headerName: 'Name', width: 140, type: 'formula' },
+  { field: 'year_1', headerName: 'Year_1', width: 100, type: 'formula' },
+  { field: 'year_2', headerName: 'Year_2', width: 100, type: 'formula' },
+  { field: 'average', headerName: 'Average', width: 110, type: 'formula' },
+  { field: 'sum', headerName: 'Sum', width: 110, type: 'formula' },
 ];
 
 const getButtonSx = (theme: Theme) => ({
@@ -251,14 +181,10 @@ function CustomToolbar(props: GridSlotProps['toolbar']) {
 
   return (
     <Toolbar>
-      {/* Formula Bar */}
       <Box sx={{ flex: 1, minWidth: 200 }}>
         <FormulaBar {...formulaBarProps} />
       </Box>
-
       <GridToolbarDivider />
-
-      {/* Add Row/Column Buttons */}
       <rootProps.slots.baseTooltip title="Add Row">
         <ToolbarButton onClick={onAddRow}>
           <PostAddIcon fontSize="small" />
@@ -269,10 +195,7 @@ function CustomToolbar(props: GridSlotProps['toolbar']) {
           <PlaylistAddIcon fontSize="small" />
         </ToolbarButton>
       </rootProps.slots.baseTooltip>
-
       <GridToolbarDivider />
-
-      {/* Export Menu */}
       <rootProps.slots.baseTooltip
         title={apiRef.current.getLocaleText('toolbarExport')}
         disableInteractive={exportMenuOpen}
@@ -288,7 +211,6 @@ function CustomToolbar(props: GridSlotProps['toolbar']) {
           <rootProps.slots.exportIcon fontSize="small" />
         </ToolbarButton>
       </rootProps.slots.baseTooltip>
-
       <GridMenu
         target={exportMenuTriggerRef.current}
         open={exportMenuOpen}
@@ -302,25 +224,19 @@ function CustomToolbar(props: GridSlotProps['toolbar']) {
           {...rootProps.slotProps?.baseMenuList}
         >
           <ExportPrint
-            render={
-              <rootProps.slots.baseMenuItem {...rootProps.slotProps?.baseMenuItem} />
-            }
+            render={<rootProps.slots.baseMenuItem {...rootProps.slotProps?.baseMenuItem} />}
             onClick={closeExportMenu}
           >
             {apiRef.current.getLocaleText('toolbarExportPrint')}
           </ExportPrint>
           <ExportCsv
-            render={
-              <rootProps.slots.baseMenuItem {...rootProps.slotProps?.baseMenuItem} />
-            }
+            render={<rootProps.slots.baseMenuItem {...rootProps.slotProps?.baseMenuItem} />}
             onClick={closeExportMenu}
           >
             {apiRef.current.getLocaleText('toolbarExportCSV')}
           </ExportCsv>
           <ExportExcel
-            render={
-              <rootProps.slots.baseMenuItem {...rootProps.slotProps?.baseMenuItem} />
-            }
+            render={<rootProps.slots.baseMenuItem {...rootProps.slotProps?.baseMenuItem} />}
             options={excelOptions}
             onClick={closeExportMenu}
           >
@@ -338,6 +254,7 @@ export default function SortingWithHyperFormula() {
   const [newFieldName, setNewFieldName] = React.useState('');
   const [newColumnName, setNewColumnName] = React.useState('');
   const [fieldError, setFieldError] = React.useState('');
+  const [sortModel, setSortModel] = React.useState<GridSortModel>([]);
 
   const {
     columns,
@@ -347,11 +264,22 @@ export default function SortingWithHyperFormula() {
     addRow,
     addColumn,
     isFieldDuplicate,
+    sortRows,
   } = useFormulaSupport({
     columns: baseColumns,
     initialData: rowData,
     apiRef,
   });
+
+  const handleSortModelChange = React.useCallback(
+    (newSortModel: GridSortModel) => {
+      setSortModel(newSortModel);
+      if (newSortModel.length > 0) {
+        sortRows(newSortModel);
+      }
+    },
+    [sortRows],
+  );
 
   const handleOpenColumnDialog = () => {
     setNewFieldName('');
@@ -402,8 +330,9 @@ export default function SortingWithHyperFormula() {
             fontFamily: '"Calibri", "Segoe UI", sans-serif',
           }}
         >
-          💡 Click column headers to sort. Hold Shift + click for multi-column
-          sorting. Formula errors are sorted to the bottom.
+          💡 Click column headers to sort. Sorting physically rearranges rows in
+          HyperFormula via <code>moveRows()</code> — formula references update
+          automatically. The row number column always shows sequential 1, 2, 3…
         </Typography>
 
         <Dialog open={columnDialogOpen} onClose={handleCloseColumnDialog}>
@@ -422,12 +351,7 @@ export default function SortingWithHyperFormula() {
               error={!!fieldError}
               helperText={fieldError}
               size="small"
-              sx={{
-                mt: 1,
-                '& .MuiInputBase-root': {
-                  fontFamily: '"Calibri", "Segoe UI", sans-serif',
-                },
-              }}
+              sx={{ mt: 1, '& .MuiInputBase-root': { fontFamily: '"Calibri", "Segoe UI", sans-serif' } }}
             />
             <TextField
               margin="dense"
@@ -437,45 +361,23 @@ export default function SortingWithHyperFormula() {
               value={newColumnName}
               onChange={(event) => setNewColumnName(event.target.value)}
               size="small"
-              sx={{
-                mt: 1,
-                '& .MuiInputBase-root': {
-                  fontFamily: '"Calibri", "Segoe UI", sans-serif',
-                },
-              }}
+              sx={{ mt: 1, '& .MuiInputBase-root': { fontFamily: '"Calibri", "Segoe UI", sans-serif' } }}
             />
           </DialogContent>
           <DialogActions>
-            <Button
-              onClick={handleCloseColumnDialog}
-              sx={(theme) => getButtonSx(theme)}
-            >
+            <Button onClick={handleCloseColumnDialog} sx={(theme) => getButtonSx(theme)}>
               Cancel
             </Button>
             <Button
               onClick={handleAddColumn}
               disabled={!canAddColumn}
-              sx={(theme) => {
-                const baseButtonSx = getButtonSx(theme);
-                const disabledBg =
-                  theme.palette.mode === 'dark'
-                    ? theme.palette.grey[800]
-                    : theme.palette.grey[100];
-                const disabledHoverBg =
-                  theme.palette.mode === 'dark'
-                    ? theme.palette.grey[700]
-                    : theme.palette.grey[200];
-
-                return {
-                  ...baseButtonSx,
-                  backgroundColor: canAddColumn ? '#4472C4' : disabledBg,
-                  color: canAddColumn ? '#fff' : theme.palette.text.primary,
-                  '&:hover': {
-                    backgroundColor: canAddColumn ? '#3861a8' : disabledHoverBg,
-                  },
-                  mr: 0.5,
-                };
-              }}
+              sx={(theme) => ({
+                ...getButtonSx(theme),
+                backgroundColor: canAddColumn ? '#4472C4' : undefined,
+                color: canAddColumn ? '#fff' : undefined,
+                '&:hover': { backgroundColor: canAddColumn ? '#3861a8' : undefined },
+                mr: 0.5,
+              })}
             >
               Add
             </Button>
@@ -492,26 +394,19 @@ export default function SortingWithHyperFormula() {
           showCellVerticalBorder
           disableColumnFilter
           disableColumnMenu
-          disableMultipleColumnsSorting={false}
+          sortingMode="server"
+          sortModel={sortModel}
+          onSortModelChange={handleSortModelChange}
           hideFooter
           historyStackSize={0}
           showToolbar
-          slots={{
-            toolbar: CustomToolbar,
-          }}
+          slots={{ toolbar: CustomToolbar }}
           slotProps={{
             toolbar: {
               formulaBarProps,
               onAddRow: addRow,
               onAddColumn: handleOpenColumnDialog,
-              excelOptions: {
-                escapeFormulas: false,
-              },
-            },
-          }}
-          initialState={{
-            sorting: {
-              sortModel: [{ field: 'year_1', sort: 'desc' }],
+              excelOptions: { escapeFormulas: false },
             },
           }}
           sx={(theme) => ({
@@ -521,10 +416,7 @@ export default function SortingWithHyperFormula() {
                   ? theme.palette.grey[800]
                   : theme.palette.grey[100],
             },
-            '& .MuiDataGrid-columnHeaderTitle': {
-              fontWeight: 600,
-            },
-
+            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 600 },
             '& .row-number-cell': {
               display: 'flex',
               justifyContent: 'center',
@@ -535,17 +427,13 @@ export default function SortingWithHyperFormula() {
               color: theme.palette.text.primary,
               fontWeight: 600,
             },
-
             '& .MuiDataGrid-cell:focus': {
               outline: '2px solid #4472C4',
               outlineOffset: '-2px',
               backgroundColor:
                 theme.palette.mode === 'dark' ? alpha('#4472C4', 0.3) : '#D6DCE5',
             },
-            '& .MuiDataGrid-cell:focus-within': {
-              outline: '2px solid #4472C4',
-            },
-
+            '& .MuiDataGrid-cell:focus-within': { outline: '2px solid #4472C4' },
             '& .Mui-selected, .MuiDataGrid-row:hover': {
               backgroundColor: 'transparent !important',
             },
