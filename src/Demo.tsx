@@ -30,9 +30,9 @@ import {
   useFormulaSupport,
   FormulaColumnDef,
   FormulaBarProps,
-} from 'useFormulaSupport';
-import { FormulaBar } from 'FormulaBar';
-import { HyperFormulaContext } from 'formulaSupportContext';
+} from './useFormulaSupport';
+import { FormulaBar } from './FormulaBar';
+import { HyperFormulaContext } from './formulaSupportContext';
 
 declare module '@mui/x-data-grid-premium' {
   interface ToolbarPropsOverrides {
