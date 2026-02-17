@@ -149,50 +149,28 @@ export function useFormulaSupport(
     };
   });
 
-  const addedRowIdsRef = React.useRef<Map<number, GridRowId>>(new Map());
-
-  // Track the current row ordering (HF row indices)
-  const [rowOrder, setRowOrder] = React.useState<number[]>(() =>
-    Array.from({ length: initialData.length }, (_, i) => i),
+  // Stable map: HF row index → GridRowId (survives physical row rearrangement)
+  const rowIdMapRef = React.useRef<Map<number, GridRowId>>(
+    new Map(initialData.map((row, i) => [i, getRowId?.(row, i) ?? i])),
   );
 
-  // Keep rowOrder in sync when rows are added
-  React.useEffect(() => {
-    setRowOrder((prev) => {
-      if (prev.length < rowCount) {
-        const newOrder = [...prev];
-        for (let i = prev.length; i < rowCount; i++) {
-          newOrder.push(i);
-        }
-        return newOrder;
-      }
-      return prev;
-    });
-  }, [rowCount]);
-
-  // Version counter to force re-render after moves
+  // Version counter to force re-render after sort/move operations
   const [hfVersion, setHfVersion] = React.useState(0);
 
   const rows = React.useMemo<HFRow[]>(() => {
     if (!hfRef.current) {
       return [];
     }
-    return rowOrder.map((hfRowIndex, displayIndex) => {
-      const rowData = initialData[hfRowIndex];
-      let rowId: GridRowId;
-      if (rowData) {
-        rowId = getRowId?.(rowData, hfRowIndex) ?? hfRowIndex;
-      } else {
-        rowId = addedRowIdsRef.current.get(hfRowIndex) ?? hfRowIndex;
-      }
+    return Array.from({ length: rowCount }, (_, i) => {
+      const rowId = rowIdMapRef.current.get(i) ?? i;
       return {
         id: rowId,
-        _hfRowIndex: displayIndex,
-        row_number: displayIndex + 1,
+        _hfRowIndex: i,
+        row_number: i + 1,
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInitialized, getRowId, rowOrder, hfVersion]);
+  }, [isInitialized, rowCount, hfVersion]);
 
   const getCellValue = useEventCallback((hfRowIndex: number, colIndex: number) => {
     if (!hfRef.current) {
@@ -436,7 +414,7 @@ export function useFormulaSupport(
     hf.addRows(sheetId, [rowCount, 1]);
     const newRowId = nextRowIdRef.current;
     nextRowIdRef.current += 1;
-    addedRowIdsRef.current.set(rowCount, newRowId);
+    rowIdMapRef.current.set(rowCount, newRowId);
     setRowCount((prev) => prev + 1);
   });
 
@@ -466,117 +444,114 @@ export function useFormulaSupport(
 
   /**
    * Move a row using HyperFormula's moveRows() API.
-   * This ensures all formula references are updated automatically.
    */
   const moveRow = useEventCallback((sourceIndex: number, targetIndex: number) => {
     if (!hfRef.current || sourceIndex === targetIndex) {
       return;
     }
     const { hf, sheetId } = hfRef.current;
-
-    // Use HyperFormula's moveRows to keep formula references intact
     hf.moveRows(sheetId, [sourceIndex], targetIndex);
 
-    // Update the row order to reflect the move
-    setRowOrder((prev) => {
-      const newOrder = [...prev];
-      const [moved] = newOrder.splice(sourceIndex, 1);
-      // After removing, if target > source, the target index shifts by -1
-      const adjustedTarget = targetIndex > sourceIndex ? targetIndex - 1 : targetIndex;
-      newOrder.splice(adjustedTarget, 0, moved);
-      return newOrder;
-    });
+    // Rebuild row ID map after move
+    const oldMap = new Map(rowIdMapRef.current);
+    const newMap = new Map<number, GridRowId>();
+    const numRows = hf.getSheetDimensions(sheetId).height;
+    const adjustedTarget = targetIndex > sourceIndex ? targetIndex - 1 : targetIndex;
 
+    for (let i = 0; i < numRows; i++) {
+      let oldIdx: number;
+      if (i === adjustedTarget) {
+        oldIdx = sourceIndex;
+      } else if (sourceIndex < adjustedTarget) {
+        oldIdx = i >= sourceIndex && i < adjustedTarget ? i + 1 : i;
+      } else {
+        oldIdx = i > adjustedTarget && i <= sourceIndex ? i - 1 : i;
+      }
+      const id = oldMap.get(oldIdx);
+      if (id !== undefined) newMap.set(i, id);
+    }
+    rowIdMapRef.current = newMap;
     setHfVersion((v) => v + 1);
   });
 
   /**
-   * Sort rows in HyperFormula by physically rearranging them via moveRows().
-   * This ensures all formula references (e.g., =SUM(B1:B10)) update correctly.
-   * The row_number column always shows sequential 1, 2, 3… after sort.
+   * Sort rows in HyperFormula using setRowOrder() — a single atomic operation
+   * that physically rearranges rows and updates all formula references.
    */
   const sortRows = useEventCallback((sortModel: GridSortModel) => {
     if (!hfRef.current || sortModel.length === 0) {
       return;
     }
     const { hf, sheetId } = hfRef.current;
-    const rowCount = hf.getSheetDimensions(sheetId).height;
+    const numRows = hf.getSheetDimensions(sheetId).height;
+    if (numRows === 0) return;
 
-    // Build array of { hfRowIndex, values } for sorting
-    const rowsWithValues = Array.from({ length: rowCount }, (_, i) => {
+    // 1. Read computed values for sort columns
+    const rowEntries = Array.from({ length: numRows }, (_, i) => {
       const values: Record<string, any> = {};
       for (const [field, colIdx] of columnFieldMap.entries()) {
         values[field] = hf.getCellValue({ sheet: sheetId, row: i, col: colIdx });
       }
-      return { hfRowIndex: i, values };
+      return { originalIndex: i, values };
     });
 
-    // Sort using the sort model (supports multi-column)
-    rowsWithValues.sort((a, b) => {
+    // 2. Sort to determine desired order
+    rowEntries.sort((a, b) => {
       for (const { field, sort } of sortModel) {
         if (!sort) continue;
-        const colIdx = columnFieldMap.get(field);
-        if (colIdx === undefined) continue;
-
         const va = a.values[field];
         const vb = b.values[field];
-        const direction = sort === 'asc' ? 1 : -1;
+        const dir = sort === 'asc' ? 1 : -1;
 
-        // Push errors/nulls to bottom
-        const isErrA = va != null && typeof va === 'object';
-        const isErrB = vb != null && typeof vb === 'object';
-        if (isErrA && !isErrB) return 1;
-        if (!isErrA && isErrB) return -1;
-        if (isErrA && isErrB) continue;
+        const aErr = va != null && typeof va === 'object';
+        const bErr = vb != null && typeof vb === 'object';
+        if (aErr && !bErr) return 1;
+        if (!aErr && bErr) return -1;
+        if (aErr && bErr) continue;
         if (va == null && vb != null) return 1;
         if (va != null && vb == null) return -1;
 
-        // Compare
         let cmp = 0;
         if (typeof va === 'string' && typeof vb === 'string') {
           cmp = va.localeCompare(vb);
         } else {
           cmp = (Number(va) || 0) - (Number(vb) || 0);
         }
-        if (cmp !== 0) return cmp * direction;
+        if (cmp !== 0) return cmp * dir;
       }
       return 0;
     });
 
-    // Apply the sort by moving rows one by one from top to bottom.
-    // We track where each original row currently sits after previous moves.
-    const currentPositions = Array.from({ length: rowCount }, (_, i) => i);
-
-    for (let targetPos = 0; targetPos < rowCount; targetPos++) {
-      const desiredOriginal = rowsWithValues[targetPos].hfRowIndex;
-      const currentPos = currentPositions[desiredOriginal];
-
-      if (currentPos !== targetPos) {
-        hf.moveRows(sheetId, [currentPos], targetPos);
-
-        // Update position tracking: the row that was at currentPos moved to targetPos
-        // All rows between shifted by 1
-        const movedOriginal = desiredOriginal;
-        for (const [origIdx, pos] of currentPositions.entries()) {
-          if (origIdx === movedOriginal) continue;
-          if (currentPos > targetPos) {
-            // Moved up: rows in [targetPos, currentPos) shift down by 1
-            if (pos >= targetPos && pos < currentPos) {
-              currentPositions[origIdx] = pos + 1;
-            }
-          } else {
-            // Moved down: rows in (currentPos, targetPos] shift up by 1
-            if (pos > currentPos && pos <= targetPos) {
-              currentPositions[origIdx] = pos - 1;
-            }
-          }
-        }
-        currentPositions[movedOriginal] = targetPos;
-      }
+    // 3. Build permutation array: newRowOrder[originalIndex] = newPosition
+    const newRowOrder = new Array(numRows);
+    for (let newPos = 0; newPos < numRows; newPos++) {
+      newRowOrder[rowEntries[newPos].originalIndex] = newPos;
     }
 
-    // Reset rowOrder to sequential since HF rows are now physically sorted
-    setRowOrder(Array.from({ length: rowCount }, (_, i) => i));
+    // 4. Check if already in order (no-op)
+    const isIdentity = newRowOrder.every((pos: number, i: number) => pos === i);
+    if (isIdentity) return;
+
+    // 5. Apply via setRowOrder — single atomic operation, updates all formula refs
+    if (hf.isItPossibleToSetRowOrder(sheetId, newRowOrder)) {
+      hf.setRowOrder(sheetId, newRowOrder);
+    } else {
+      console.warn('Cannot sort: array formulas prevent row reordering');
+      return;
+    }
+
+    // 6. Rebuild row ID map to match new physical positions
+    const oldMap = new Map(rowIdMapRef.current);
+    const newMap = new Map<number, GridRowId>();
+    for (let newPos = 0; newPos < numRows; newPos++) {
+      const oldPos = rowEntries[newPos].originalIndex;
+      const id = oldMap.get(oldPos);
+      if (id !== undefined) {
+        newMap.set(newPos, id);
+      }
+    }
+    rowIdMapRef.current = newMap;
+
     setHfVersion((v) => v + 1);
   });
 
