@@ -10,10 +10,10 @@ import { alpha } from '@mui/material/styles';
 import {
   useFormulaSupport,
   FormulaColumnDef,
-} from 'useFormulaSupport';
-import { FormulaBar } from 'FormulaBar';
-import { rowData } from 'formulaSupportData';
-import { HyperFormulaContext } from 'formulaSupportContext';
+} from './useFormulaSupport';
+import { FormulaBar } from './FormulaBar';
+import { rowData } from './formulaSupportData';
+import { HyperFormulaContext } from './formulaSupportContext';
 
 const baseColumns: FormulaColumnDef[] = [
   { field: 'name', headerName: 'Name', width: 160, type: 'formula' },
