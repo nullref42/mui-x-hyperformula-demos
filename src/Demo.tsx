@@ -271,15 +271,24 @@ export default function SortingWithHyperFormula() {
     apiRef,
   });
 
+  // The last row (Total) is an aggregate row — exclude from sorting, pin to bottom
+  const totalRowIndex = rowData.length - 1;
+
   const handleSortModelChange = React.useCallback(
     (newSortModel: GridSortModel) => {
       setSortModel(newSortModel);
       if (newSortModel.length > 0) {
-        sortRows(newSortModel);
+        sortRows(newSortModel, [totalRowIndex]);
       }
     },
-    [sortRows],
+    [sortRows, totalRowIndex],
   );
+
+  // Split rows: data rows for the grid, Total row pinned at bottom
+  const dataRows = React.useMemo(() => rows.filter((_, i) => i !== totalRowIndex), [rows, totalRowIndex]);
+  const pinnedRows = React.useMemo(() => ({
+    bottom: rows.filter((_, i) => i === totalRowIndex),
+  }), [rows, totalRowIndex]);
 
   const handleOpenColumnDialog = () => {
     setNewFieldName('');
@@ -331,8 +340,8 @@ export default function SortingWithHyperFormula() {
           }}
         >
           💡 Click column headers to sort. Sorting physically rearranges rows in
-          HyperFormula via <code>moveRows()</code> — formula references update
-          automatically. The row number column always shows sequential 1, 2, 3…
+          HyperFormula via <code>setRowOrder()</code> — formula references update
+          automatically. The Total row is pinned at the bottom (excluded from sorting).
         </Typography>
 
         <Dialog open={columnDialogOpen} onClose={handleCloseColumnDialog}>
@@ -387,7 +396,8 @@ export default function SortingWithHyperFormula() {
         <DataGridPremium
           apiRef={apiRef}
           columns={columns}
-          rows={rows}
+          rows={dataRows}
+          pinnedRows={pinnedRows}
           density="compact"
           tabNavigation="all"
           showColumnVerticalBorder

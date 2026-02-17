@@ -61,7 +61,7 @@ export interface UseFormulaSupportResult {
    * Sort rows in HyperFormula using moveRows() so formula references update.
    * Uses sortingMode="server" pattern — the grid delegates sorting to HF.
    */
-  sortRows: (sortModel: GridSortModel) => void;
+  sortRows: (sortModel: GridSortModel, excludeHfRows?: number[]) => void;
 }
 
 interface HFRow extends GridRowModel {
@@ -478,7 +478,7 @@ export function useFormulaSupport(
    * Sort rows in HyperFormula using setRowOrder() — a single atomic operation
    * that physically rearranges rows and updates all formula references.
    */
-  const sortRows = useEventCallback((sortModel: GridSortModel) => {
+  const sortRows = useEventCallback((sortModel: GridSortModel, excludeHfRows?: number[]) => {
     if (!hfRef.current || sortModel.length === 0) {
       return;
     }
@@ -486,7 +486,9 @@ export function useFormulaSupport(
     const numRows = hf.getSheetDimensions(sheetId).height;
     if (numRows === 0) return;
 
-    // 1. Read computed values for sort columns
+    const excludeSet = new Set(excludeHfRows ?? []);
+
+    // 1. Read computed values for sort columns (only sortable rows)
     const rowEntries = Array.from({ length: numRows }, (_, i) => {
       const values: Record<string, any> = {};
       for (const [field, colIdx] of columnFieldMap.entries()) {
@@ -495,8 +497,12 @@ export function useFormulaSupport(
       return { originalIndex: i, values };
     });
 
-    // 2. Sort to determine desired order
-    rowEntries.sort((a, b) => {
+    // 2. Separate sortable and pinned rows
+    const sortableEntries = rowEntries.filter((e) => !excludeSet.has(e.originalIndex));
+    const pinnedEntries = rowEntries.filter((e) => excludeSet.has(e.originalIndex));
+
+    // Sort only the sortable rows
+    sortableEntries.sort((a, b) => {
       for (const { field, sort } of sortModel) {
         if (!sort) continue;
         const va = a.values[field];
@@ -523,9 +529,26 @@ export function useFormulaSupport(
     });
 
     // 3. Build permutation array: newRowOrder[originalIndex] = newPosition
+    //    Pinned rows stay at their original positions.
+    //    Sortable rows fill the remaining slots in sorted order.
     const newRowOrder = new Array(numRows);
-    for (let newPos = 0; newPos < numRows; newPos++) {
-      newRowOrder[rowEntries[newPos].originalIndex] = newPos;
+
+    // First, pin excluded rows at their original positions
+    for (const entry of pinnedEntries) {
+      newRowOrder[entry.originalIndex] = entry.originalIndex;
+    }
+
+    // Collect available (non-pinned) slots
+    const availableSlots: number[] = [];
+    for (let i = 0; i < numRows; i++) {
+      if (!excludeSet.has(i)) {
+        availableSlots.push(i);
+      }
+    }
+
+    // Place sorted rows into available slots
+    for (let i = 0; i < sortableEntries.length; i++) {
+      newRowOrder[sortableEntries[i].originalIndex] = availableSlots[i];
     }
 
     // 4. Check if already in order (no-op)
