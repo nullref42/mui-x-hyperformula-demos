@@ -318,8 +318,14 @@ export default function ExcelFormulaSupport() {
           disableColumnFilter
           disableColumnMenu
           disableColumnSorting
-          hideFooter
           historyStackSize={0}
+          checkboxSelection
+          cellSelection
+          pagination
+          pageSizeOptions={[5, 10, 25]}
+          initialState={{
+            pagination: { paginationModel: { pageSize: 5 } },
+          }}
           showToolbar
           slots={{
             toolbar: CustomToolbar,
