@@ -1,11 +1,11 @@
-// Data in Data Grid row format (objects with named properties)
-// Formulas reference cells using HyperFormula's A1 notation
+// Data with formulas, large values, negative values, and a division-by-zero error
+// for demonstrating conditional styling with HyperFormula's getCellType() API
 
 export const rowData = [
   {
     id: 1,
     name: 'Greg Black',
-    year_1: 4.66,
+    year_1: 145.50,
     year_2: '=B1*1.3',
     average: '=AVERAGE(B1:C1)',
     sum: '=SUM(B1:C1)',
@@ -13,7 +13,7 @@ export const rowData = [
   {
     id: 2,
     name: 'Anne Carpenter',
-    year_1: 5.25,
+    year_1: -12.30,
     year_2: '=$B$2*30%',
     average: '=AVERAGE(B2:C2)',
     sum: '=SUM(B2:C2)',
@@ -29,7 +29,7 @@ export const rowData = [
   {
     id: 4,
     name: 'John Sieg',
-    year_1: 12.51,
+    year_1: 250.00,
     year_2: '=B4*(1.22+1)',
     average: '=AVERAGE(B4:C4)',
     sum: '=SUM(B4:C4)',
@@ -37,8 +37,8 @@ export const rowData = [
   {
     id: 5,
     name: 'Chris Aklips',
-    year_1: 7.63,
-    year_2: '=B5*1.1*SUM(10,20)+1',
+    year_1: -45.20,
+    year_2: '=B5/0',
     average: '=AVERAGE(B5:C5)',
     sum: '=SUM(B5:C5)',
   },
@@ -47,7 +47,7 @@ export const rowData = [
     name: 'Total',
     year_1: '=SUM(B1:B5)',
     year_2: '=SUM(C1:C5)',
-    average: '=IF(SUM(D1:D5)>100, "Greater than 100", "Less than 100")',
+    average: '=IF(SUM(D1:D5)>100, "Over 100", "Under 100")',
     sum: '=SUM(E1:E5)',
   },
 ];

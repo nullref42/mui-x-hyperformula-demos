@@ -1,376 +1,170 @@
 import * as React from 'react';
-import useId from '@mui/utils/useId';
 import {
   DataGridPremium,
-  GridSlotProps,
   useGridApiRef,
-  useGridApiContext,
-  useGridRootProps,
-  Toolbar,
-  ToolbarButton,
-  ExportCsv,
-  ExportPrint,
-  ExportExcel,
-  GridMenu,
 } from '@mui/x-data-grid-premium';
-import { GridToolbarDivider } from '@mui/x-data-grid/internals';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import { Theme, alpha } from '@mui/material/styles';
-import PostAddIcon from '@mui/icons-material/PostAdd';
-import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
-import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import Alert from '@mui/material/Alert';
+import Chip from '@mui/material/Chip';
+import { alpha } from '@mui/material/styles';
 import {
   useFormulaSupport,
   FormulaColumnDef,
-  FormulaBarProps,
 } from 'useFormulaSupport';
-import { FormulaBar } from 'FormulaBar';
-import { rowData } from 'formulaSupportData';
 import { HyperFormulaContext } from 'formulaSupportContext';
 
-declare module '@mui/x-data-grid-premium' {
-  interface ToolbarPropsOverrides {
-    formulaBarProps: FormulaBarProps;
-    onAddRow: () => void;
-    onAddColumn: () => void;
+// Generate 1500 rows of data with formulas
+function generateLargeDataset(count: number) {
+  const names = [
+    'Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry',
+    'Iris', 'Jack', 'Karen', 'Leo', 'Mona', 'Nick', 'Olivia', 'Paul',
+  ];
+  const rows = [];
+  for (let i = 0; i < count; i++) {
+    const name = names[i % names.length];
+    const q1 = Math.round(Math.random() * 10000) / 100;
+    const q2 = Math.round(Math.random() * 10000) / 100;
+    const q3 = Math.round(Math.random() * 10000) / 100;
+    const q4 = Math.round(Math.random() * 10000) / 100;
+    const row = i + 1; // 1-indexed for HyperFormula
+    rows.push({
+      id: i + 1,
+      name: `${name} #${i + 1}`,
+      q1,
+      q2,
+      q3,
+      q4,
+      total: `=SUM(B${row}:E${row})`,
+      average: `=AVERAGE(B${row}:E${row})`,
+      max_val: `=MAX(B${row}:E${row})`,
+      pct_of_total: `=F${row}/IF(F${row}=0,1,F${row})*100`,
+    });
   }
+  return rows;
 }
+
+const ROW_COUNT = 1500;
 
 const baseColumns: FormulaColumnDef[] = [
-  { field: 'name', headerName: 'Name', width: 130, type: 'formula' },
-  { field: 'year_1', headerName: 'Year_1', width: 100, type: 'formula' },
-  { field: 'year_2', headerName: 'Year_2', width: 100, type: 'formula' },
+  { field: 'name', headerName: 'Name', width: 140, type: 'formula' },
+  { field: 'q1', headerName: 'Q1', width: 90, type: 'formula' },
+  { field: 'q2', headerName: 'Q2', width: 90, type: 'formula' },
+  { field: 'q3', headerName: 'Q3', width: 90, type: 'formula' },
+  { field: 'q4', headerName: 'Q4', width: 90, type: 'formula' },
+  { field: 'total', headerName: 'Total', width: 100, type: 'formula' },
   { field: 'average', headerName: 'Average', width: 100, type: 'formula' },
-  { field: 'sum', headerName: 'Sum', width: 100, type: 'formula' },
+  { field: 'max_val', headerName: 'Max', width: 90, type: 'formula' },
+  { field: 'pct_of_total', headerName: '% of Total', width: 100, type: 'formula' },
 ];
 
-const getButtonSx = (theme: Theme) => ({
-  backgroundColor:
-    theme.palette.mode === 'dark'
-      ? theme.palette.grey[800]
-      : theme.palette.grey[100],
-  border: '1px solid',
-  borderColor: theme.palette.divider,
-  borderRadius: '4px',
-  color: theme.palette.text.primary,
-  fontFamily: '"Calibri", "Segoe UI", sans-serif',
-  fontSize: '12px',
-  fontWeight: 500,
-  textTransform: 'none',
-  px: 2,
-  height: '34px',
-  '&:hover': {
-    backgroundColor:
-      theme.palette.mode === 'dark'
-        ? theme.palette.grey[700]
-        : theme.palette.grey[200],
-    borderColor:
-      theme.palette.mode === 'dark'
-        ? theme.palette.grey[600]
-        : theme.palette.grey[400],
-  },
-});
-
-function CustomToolbar(props: GridSlotProps['toolbar']) {
-  const { formulaBarProps, onAddRow, onAddColumn, excelOptions } = props;
-  const apiRef = useGridApiContext();
-  const rootProps = useGridRootProps();
-  const [exportMenuOpen, setExportMenuOpen] = React.useState(false);
-  const exportMenuTriggerRef = React.useRef<HTMLButtonElement>(null);
-  const exportMenuId = useId();
-  const exportMenuTriggerId = useId();
-
-  const closeExportMenu = () => setExportMenuOpen(false);
-
-  return (
-    <Toolbar>
-      {/* Formula Bar */}
-      <Box sx={{ flex: 1, minWidth: 200 }}>
-        <FormulaBar {...formulaBarProps} />
-      </Box>
-
-      <GridToolbarDivider />
-
-      {/* Add Row/Column Buttons */}
-      <rootProps.slots.baseTooltip title="Add Row">
-        <ToolbarButton onClick={onAddRow}>
-          <PostAddIcon fontSize="small" />
-        </ToolbarButton>
-      </rootProps.slots.baseTooltip>
-      <rootProps.slots.baseTooltip title="Add Column">
-        <ToolbarButton onClick={onAddColumn}>
-          <PlaylistAddIcon fontSize="small" />
-        </ToolbarButton>
-      </rootProps.slots.baseTooltip>
-
-      <GridToolbarDivider />
-
-      {/* Export Menu */}
-      <rootProps.slots.baseTooltip
-        title={apiRef.current.getLocaleText('toolbarExport')}
-        disableInteractive={exportMenuOpen}
-      >
-        <ToolbarButton
-          ref={exportMenuTriggerRef}
-          id={exportMenuTriggerId}
-          aria-controls={exportMenuId}
-          aria-haspopup="true"
-          aria-expanded={exportMenuOpen ? 'true' : undefined}
-          onClick={() => setExportMenuOpen(!exportMenuOpen)}
-        >
-          <rootProps.slots.exportIcon fontSize="small" />
-        </ToolbarButton>
-      </rootProps.slots.baseTooltip>
-
-      <GridMenu
-        target={exportMenuTriggerRef.current}
-        open={exportMenuOpen}
-        onClose={closeExportMenu}
-        position="bottom-end"
-      >
-        <rootProps.slots.baseMenuList
-          id={exportMenuId}
-          aria-labelledby={exportMenuTriggerId}
-          autoFocusItem
-          {...rootProps.slotProps?.baseMenuList}
-        >
-          <ExportPrint
-            render={
-              <rootProps.slots.baseMenuItem {...rootProps.slotProps?.baseMenuItem} />
-            }
-            onClick={closeExportMenu}
-          >
-            {apiRef.current.getLocaleText('toolbarExportPrint')}
-          </ExportPrint>
-          <ExportCsv
-            render={
-              <rootProps.slots.baseMenuItem {...rootProps.slotProps?.baseMenuItem} />
-            }
-            onClick={closeExportMenu}
-          >
-            {apiRef.current.getLocaleText('toolbarExportCSV')}
-          </ExportCsv>
-          <ExportExcel
-            render={
-              <rootProps.slots.baseMenuItem {...rootProps.slotProps?.baseMenuItem} />
-            }
-            options={excelOptions}
-            onClick={closeExportMenu}
-          >
-            {apiRef.current.getLocaleText('toolbarExportExcel')}
-          </ExportExcel>
-        </rootProps.slots.baseMenuList>
-      </GridMenu>
-    </Toolbar>
-  );
-}
-
-export default function ExcelFormulaSupport() {
+export default function LargeDatasetPerformanceDemo() {
   const apiRef = useGridApiRef();
-  const [columnDialogOpen, setColumnDialogOpen] = React.useState(false);
-  const [newFieldName, setNewFieldName] = React.useState('');
-  const [newColumnName, setNewColumnName] = React.useState('');
-  const [fieldError, setFieldError] = React.useState('');
+  const [loadTime, setLoadTime] = React.useState<number | null>(null);
+
+  // Generate data once
+  const largeData = React.useMemo(() => generateLargeDataset(ROW_COUNT), []);
 
   const {
     columns,
     rows,
-    formulaBarProps,
     hfContextValue,
-    addRow,
-    addColumn,
-    isFieldDuplicate,
   } = useFormulaSupport({
     columns: baseColumns,
-    initialData: rowData,
+    initialData: largeData,
     apiRef,
+    useBatchEvaluation: true, // Uses suspendEvaluation/resumeEvaluation
   });
 
-  const handleOpenColumnDialog = () => {
-    setNewFieldName('');
-    setNewColumnName('');
-    setFieldError('');
-    setColumnDialogOpen(true);
-  };
-
-  const handleCloseColumnDialog = () => {
-    setColumnDialogOpen(false);
-    setNewFieldName('');
-    setNewColumnName('');
-    setFieldError('');
-  };
-
-  const validateFieldName = (field: string) => {
-    if (field.trim() && isFieldDuplicate(field)) {
-      setFieldError('Field name already exists');
-      return false;
+  // Measure when rows are available
+  React.useEffect(() => {
+    if (rows.length > 0 && loadTime === null) {
+      setLoadTime(performance.now());
     }
-    setFieldError('');
-    return true;
-  };
+  }, [rows, loadTime]);
 
-  const handleFieldNameChange = (value: string) => {
-    setNewFieldName(value);
-    validateFieldName(value);
-  };
-
-  const canAddColumn = newFieldName.trim() && newColumnName.trim() && !fieldError;
-
-  const handleAddColumn = () => {
-    if (canAddColumn && validateFieldName(newFieldName)) {
-      addColumn(newFieldName, newColumnName);
-      handleCloseColumnDialog();
-    }
-  };
+  const startTime = React.useMemo(() => performance.now(), []);
+  const elapsed = loadTime !== null ? Math.round(loadTime - startTime) : null;
 
   return (
-    <Box sx={{ width: '100%' }}>
+    <Box sx={{ width: '100%', p: 2 }}>
+      <Typography variant="h5" gutterBottom>
+        🚀 Large Dataset Performance with HyperFormula
+      </Typography>
+      <Alert severity="info" sx={{ mb: 2 }}>
+        This demo renders <strong>{ROW_COUNT.toLocaleString()} rows</strong> with{' '}
+        <strong>4 formula columns each</strong> (
+        {(ROW_COUNT * 4).toLocaleString()} formulas total).
+        HyperFormula's <code>suspendEvaluation()</code> /{' '}
+        <code>resumeEvaluation()</code> batches all formula computation into a
+        single pass, while Data Grid's virtualization ensures only visible rows
+        are rendered.
+      </Alert>
+
+      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+        <Chip label={`${ROW_COUNT.toLocaleString()} rows`} color="primary" />
+        <Chip label={`${(ROW_COUNT * 4).toLocaleString()} formulas`} color="secondary" />
+        <Chip label="9 columns" variant="outlined" />
+        {elapsed !== null && (
+          <Chip
+            label={`Loaded in ${elapsed}ms`}
+            color="success"
+          />
+        )}
+        <Chip label="Batch evaluation enabled" color="info" variant="outlined" />
+      </Box>
+
       <HyperFormulaContext.Provider value={hfContextValue}>
-        <Dialog open={columnDialogOpen} onClose={handleCloseColumnDialog}>
-          <DialogTitle sx={{ fontFamily: '"Calibri", "Segoe UI", sans-serif' }}>
-            Add Column
-          </DialogTitle>
-          <DialogContent>
-            <TextField
-              autoFocus
-              margin="dense"
-              label="Field Name"
-              fullWidth
-              variant="outlined"
-              value={newFieldName}
-              onChange={(event) => handleFieldNameChange(event.target.value)}
-              error={!!fieldError}
-              helperText={fieldError}
-              size="small"
-              sx={{
-                mt: 1,
-                '& .MuiInputBase-root': {
-                  fontFamily: '"Calibri", "Segoe UI", sans-serif',
-                },
-              }}
-            />
-            <TextField
-              margin="dense"
-              label="Column Name"
-              fullWidth
-              variant="outlined"
-              value={newColumnName}
-              onChange={(event) => setNewColumnName(event.target.value)}
-              size="small"
-              sx={{
-                mt: 1,
-                '& .MuiInputBase-root': {
-                  fontFamily: '"Calibri", "Segoe UI", sans-serif',
-                },
-              }}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button
-              onClick={handleCloseColumnDialog}
-              sx={(theme) => getButtonSx(theme)}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleAddColumn}
-              disabled={!canAddColumn}
-              sx={(theme) => {
-                const baseButtonSx = getButtonSx(theme);
-                const disabledBg =
+        <Box sx={{ height: 600 }}>
+          <DataGridPremium
+            apiRef={apiRef}
+            columns={columns}
+            rows={rows}
+            density="compact"
+            showColumnVerticalBorder
+            showCellVerticalBorder
+            disableColumnFilter
+            disableColumnMenu
+            disableColumnSorting
+            pagination
+            pageSizeOptions={[25, 50, 100]}
+            initialState={{
+              pagination: { paginationModel: { pageSize: 50 } },
+            }}
+            sx={(theme) => ({
+              '& .MuiDataGrid-columnHeader': {
+                backgroundColor:
                   theme.palette.mode === 'dark'
                     ? theme.palette.grey[800]
-                    : theme.palette.grey[100];
-                const disabledHoverBg =
-                  theme.palette.mode === 'dark'
-                    ? theme.palette.grey[700]
-                    : theme.palette.grey[200];
-
-                return {
-                  ...baseButtonSx,
-                  backgroundColor: canAddColumn ? '#4472C4' : disabledBg,
-                  color: canAddColumn ? '#fff' : theme.palette.text.primary,
-                  '&:hover': {
-                    backgroundColor: canAddColumn ? '#3861a8' : disabledHoverBg,
-                  },
-                  mr: 0.5,
-                };
-              }}
-            >
-              Add
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        <DataGridPremium
-          apiRef={apiRef}
-          columns={columns}
-          rows={rows}
-          density="compact"
-          tabNavigation="all"
-          showColumnVerticalBorder
-          showCellVerticalBorder
-          disableColumnFilter
-          disableColumnMenu
-          disableColumnSorting
-          hideFooter
-          historyStackSize={0}
-          showToolbar
-          slots={{
-            toolbar: CustomToolbar,
-          }}
-          slotProps={{
-            toolbar: {
-              formulaBarProps,
-              onAddRow: addRow,
-              onAddColumn: handleOpenColumnDialog,
-              excelOptions: {
-                escapeFormulas: false,
+                    : theme.palette.grey[100],
               },
-            },
-          }}
-          sx={(theme) => ({
-            '& .MuiDataGrid-columnHeader': {
-              backgroundColor:
-                theme.palette.mode === 'dark'
-                  ? theme.palette.grey[800]
-                  : theme.palette.grey[100],
-            },
-            '& .MuiDataGrid-columnHeaderTitle': {
-              fontWeight: 600,
-            },
-
-            '& .row-number-cell': {
-              display: 'flex',
-              justifyContent: 'center',
-              backgroundColor:
-                theme.palette.mode === 'dark'
-                  ? theme.palette.grey[800]
-                  : theme.palette.grey[100],
-              color: theme.palette.text.primary,
-              fontWeight: 600,
-            },
-
-            '& .MuiDataGrid-cell:focus': {
-              outline: '2px solid #4472C4',
-              outlineOffset: '-2px',
-              backgroundColor:
-                theme.palette.mode === 'dark' ? alpha('#4472C4', 0.3) : '#D6DCE5',
-            },
-            '& .MuiDataGrid-cell:focus-within': {
-              outline: '2px solid #4472C4',
-            },
-
-            '& .Mui-selected, .MuiDataGrid-row:hover': {
-              backgroundColor: 'transparent !important',
-            },
-          })}
-        />
+              '& .MuiDataGrid-columnHeaderTitle': {
+                fontWeight: 600,
+              },
+              '& .row-number-cell': {
+                display: 'flex',
+                justifyContent: 'center',
+                backgroundColor:
+                  theme.palette.mode === 'dark'
+                    ? theme.palette.grey[800]
+                    : theme.palette.grey[100],
+                color: theme.palette.text.primary,
+                fontWeight: 600,
+              },
+              '& .MuiDataGrid-cell:focus': {
+                outline: '2px solid #4472C4',
+                outlineOffset: '-2px',
+                backgroundColor:
+                  theme.palette.mode === 'dark'
+                    ? alpha('#4472C4', 0.3)
+                    : '#D6DCE5',
+              },
+              '& .MuiDataGrid-cell:focus-within': {
+                outline: '2px solid #4472C4',
+              },
+            })}
+          />
+        </Box>
       </HyperFormulaContext.Provider>
     </Box>
   );
