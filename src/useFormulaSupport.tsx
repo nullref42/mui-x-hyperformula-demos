@@ -49,6 +49,13 @@ export interface UseFormulaSupportOptions {
    * @default 'Sheet1'
    */
   sheetName?: string;
+  /**
+   * If true, uses suspendEvaluation() / resumeEvaluation() to batch
+   * all initial data loading into a single evaluation pass.
+   * Recommended for large datasets (1000+ rows).
+   * @default false
+   */
+  useBatchEvaluation?: boolean;
 }
 
 export interface FormulaBarProps {
@@ -131,6 +138,7 @@ export function useFormulaSupport(
     apiRef,
     getRowId = defaultGetRowId,
     sheetName = 'Sheet1',
+    useBatchEvaluation = false,
   } = options;
 
   // HyperFormula instance reference
@@ -200,8 +208,17 @@ export function useFormulaSupport(
     const name = hf.addSheet(sheetName);
     const sheetId = hf.getSheetId(name)!;
 
+    // For large datasets, suspend evaluation during bulk loading
+    if (useBatchEvaluation) {
+      hf.suspendEvaluation();
+    }
+
     // Populate with initial data (converted to 2D array format)
     hf.setCellContents({ sheet: sheetId, row: 0, col: 0 }, dataArray);
+
+    if (useBatchEvaluation) {
+      hf.resumeEvaluation();
+    }
 
     hfRef.current = { hf, sheetId };
 
