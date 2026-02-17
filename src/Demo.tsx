@@ -42,11 +42,11 @@ declare module '@mui/x-data-grid-premium' {
 }
 
 const baseColumns: FormulaColumnDef[] = [
-  { field: 'name', headerName: 'Name', width: 130, type: 'formula' },
-  { field: 'year_1', headerName: 'Year_1', width: 100, type: 'formula' },
-  { field: 'year_2', headerName: 'Year_2', width: 100, type: 'formula' },
-  { field: 'average', headerName: 'Average', width: 100, type: 'formula' },
-  { field: 'sum', headerName: 'Sum', width: 100, type: 'formula' },
+  { field: 'name', headerName: 'Product', width: 130, type: 'formula' },
+  { field: 'year_1', headerName: 'Price', width: 100, type: 'formula' },
+  { field: 'year_2', headerName: 'Discounted', width: 110, type: 'formula' },
+  { field: 'average', headerName: 'Marked Up', width: 110, type: 'formula' },
+  { field: 'sum', headerName: 'Tax (8.5%)', width: 110, type: 'formula' },
 ];
 
 const getButtonSx = (theme: Theme) => ({

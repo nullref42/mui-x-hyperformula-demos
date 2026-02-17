@@ -18,6 +18,7 @@ import useOnMount from '@mui/utils/useOnMount';
 import { FormulaEditCell } from './FormulaEditCell';
 import { TitleWithAlphabet } from './TitleWithAlphabet';
 import { HyperFormulaContextValue } from './formulaSupportContext';
+import { registerCustomFunctions } from './customFunctions';
 
 export type FormulaColumnDef = Omit<GridColDef, 'type'> & {
   /**
@@ -196,6 +197,8 @@ export function useFormulaSupport(
 
   // Initialize HyperFormula
   useOnMount(() => {
+    // Register custom functions (DISCOUNT, MARKUP, TAX) before building the engine
+    registerCustomFunctions();
     const hf = HyperFormula.buildEmpty({ licenseKey: 'gpl-v3' });
     const name = hf.addSheet(sheetName);
     const sheetId = hf.getSheetId(name)!;
