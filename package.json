@@ -1,0 +1,29 @@
+{
+  "private": true,
+  "description": "MUI X Data Grid + HyperFormula Demo",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "latest",
+    "@mui/utils": "latest",
+    "@mui/x-data-grid-premium": "https://pkg.pr.new/mui/mui-x/@mui/x-data-grid-premium@a71482f6448e090ecdc4b8045181389c032cdb34",
+    "@mui/x-data-grid": "https://pkg.pr.new/mui/mui-x/@mui/x-data-grid@a71482f6448e090ecdc4b8045181389c032cdb34",
+    "@mui/material": "latest",
+    "@mui/icons-material": "latest",
+    "hyperformula": "latest",
+    "react-dom": "latest",
+    "@emotion/react": "latest",
+    "@emotion/styled": "latest",
+    "typescript": "latest"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
+  }
+}
