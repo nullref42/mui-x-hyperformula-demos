@@ -11,8 +11,8 @@ import { alpha } from '@mui/material/styles';
 import {
   useFormulaSupport,
   FormulaColumnDef,
-} from 'useFormulaSupport';
-import { HyperFormulaContext } from 'formulaSupportContext';
+} from './useFormulaSupport';
+import { HyperFormulaContext } from './formulaSupportContext';
 
 // Generate 1500 rows of data with formulas
 function generateLargeDataset(count: number) {
